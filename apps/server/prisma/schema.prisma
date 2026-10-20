@@ -1,0 +1,125 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String            @id @default(uuid())
+  email             String?           @unique
+  passwordHash      String?
+  name              String
+  avatarUrl         String?
+  role              String            @default("PARTICIPANT") // HOST, COHOST, PARTICIPANT, GUEST, ADMIN
+  isGuest           Boolean           @default(false)
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  refreshTokens     RefreshToken[]
+  hostedRooms       Room[]            @relation("HostedRooms")
+  sessions          ParticipantSession[]
+  auditLogs         AuditLog[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Room {
+  id                 String               @id @default(uuid())
+  roomCode           String               @unique // e.g. san-gam-xyz
+  title              String               @default("Sangam Meeting")
+  hostId             String
+  host               User                 @relation("HostedRooms", fields: [hostId], references: [id])
+  passcode           String?
+  isLocked           Boolean              @default(false)
+  waitingRoomEnabled Boolean              @default(false)
+  allowGuest         Boolean              @default(true)
+  muteOnEntry        Boolean              @default(false)
+  allowScreenShare   Boolean              @default(true)
+  allowChat          Boolean              @default(true)
+  allowWhiteboard    Boolean              @default(true)
+  allowFiles         Boolean              @default(true)
+  e2eeEnabled        Boolean              @default(true)
+  maxParticipants    Int                  @default(12)
+  scheduledStart     DateTime?
+  isEnded            Boolean              @default(false)
+  endedAt            DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  sessions           ParticipantSession[]
+  chatMessages       ChatMessage[]
+  sharedFiles        SharedFile[]
+  whiteboards        WhiteboardSnapshot[]
+}
+
+model ParticipantSession {
+  id         String    @id @default(uuid())
+  roomId     String
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String    @default("PARTICIPANT")
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId    String
+  senderName  String
+  recipientId String?
+  text        String
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model SharedFile {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  uploaderId  String
+  name        String
+  size        Int
+  mimeType    String
+  storagePath String
+  iv          String   // Base64 AES-GCM IV
+  encryptedKey String? // Optional hybrid wrapped key
+  recipientId String?  // Optional private recipient
+  createdAt   DateTime @default(now())
+}
+
+model WhiteboardSnapshot {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  page      Int      @default(0)
+  dataJson  String   // Serialized CRDT or canvas JSON snapshot
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g. LOGIN, ROOM_LOCK, PARTICIPANT_KICK, PASSWORD_CHANGE
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sangam-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: sangam
+      POSTGRES_PASSWORD: sangam_secret_password
+      POSTGRES_DB: sangam_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: sangam-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  server:
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    container_name: sangam-server
+    restart: always
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://sangam:sangam_secret_password@postgres:5432/sangam_db?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      JWT_ACCESS_SECRET: "sangam_jwt_super_secret_access_key_change_in_production"
+      JWT_REFRESH_SECRET: "sangam_jwt_super_secret_refresh_key_change_in_production"
+      CLIENT_URL: "http://localhost:5173"
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - redis
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: sangam-web
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
+  redis_data:

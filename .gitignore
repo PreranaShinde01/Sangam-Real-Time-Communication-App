@@ -1,0 +1,34 @@
+# Node dependencies
+node_modules/
+dist/
+build/
+.cache/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma
+*.db
+*.db-journal
+dev.db
+prisma/*.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Uploads & Temp
+uploads/
+temp/

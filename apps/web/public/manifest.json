@@ -1,0 +1,17 @@
+{
+  "name": "Sangam - Meet. Collaborate. Stay secure.",
+  "short_name": "Sangam",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "description": "Secure, real-time video conferencing, screen sharing, encrypted file sharing and collaborative whiteboard.",
+  "icons": [
+    {
+      "src": "/sangam-logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

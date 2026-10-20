@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sangam logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App-icon base -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="240" rx="112" fill="url(#shine)"/>
+
+  <!-- Video camera body -->
+  <rect x="88" y="168" width="244" height="176" rx="40" fill="#ffffff"/>
+  <!-- Camera lens wedge -->
+  <path d="M348 232 L420 184 Q432 176 432 192 L432 320 Q432 336 420 328 L348 280 Z" fill="#ffffff"/>
+
+  <!-- Keyhole / vault lock in the camera body -->
+  <circle cx="210" cy="238" r="34" fill="#4F46E5"/>
+  <path d="M210 250 L188 306 L232 306 Z" fill="#4F46E5"/>
+  <circle cx="210" cy="238" r="12" fill="#ffffff"/>
+
+  <!-- Participant dots (huddle) -->
+  <circle cx="150" cy="404" r="14" fill="#ffffff" fill-opacity="0.9"/>
+  <circle cx="210" cy="404" r="14" fill="#ffffff"/>
+  <circle cx="270" cy="404" r="14" fill="#ffffff" fill-opacity="0.9"/>
+</svg>

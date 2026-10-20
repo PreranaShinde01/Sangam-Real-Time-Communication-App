@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: Sangam Real-Time Communication Platform API
+  description: REST API for Sangam - Secure video conferencing, collaborative whiteboard, encrypted file transfers and authentication.
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000/api
+    description: Local Development Server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+
+  /auth/signup:
+    post:
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '201':
+          description: User registered successfully
+
+  /auth/login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                totpCode:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated successfully
+
+  /auth/guest:
+    post:
+      summary: Join as Guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Temporary guest session created
+
+  /rooms:
+    post:
+      summary: Create a new meeting room
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                passcode:
+                  type: string
+                waitingRoomEnabled:
+                  type: boolean
+                allowGuest:
+                  type: boolean
+      responses:
+        '201':
+          description: Room created with code and security fingerprint
+
+  /rooms/{codeOrId}:
+    get:
+      summary: Get room details by code or ID
+      parameters:
+        - name: codeOrId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Room metadata and settings
+
+  /files/upload:
+    post:
+      summary: Upload client-side AES-256-GCM encrypted file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, roomId, iv]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                roomId:
+                  type: string
+                iv:
+                  type: string
+                  description: Base64 12-byte IV
+      responses:
+        '201':
+          description: Encrypted file saved
+
+  /files/{fileId}/download:
+    get:
+      summary: Download encrypted file
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Raw encrypted ciphertext stream with X-File-IV header
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -20,7 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useRoomStore, ActiveSideTab } from '../../store/useRoomStore';
-import { useThemeStore } from '../../store/useThemeStore';
+import { useTranslation } from '../../store/useThemeStore';
 
 interface ControlBarProps {
   onToggleAudio: () => void;
@@ -65,7 +65,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
     setSecurityModalOpen,
   } = useRoomStore();
 
-  const { t } = useThemeStore();
+  const { t } = useTranslation();
   const [showReactions, setShowReactions] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 

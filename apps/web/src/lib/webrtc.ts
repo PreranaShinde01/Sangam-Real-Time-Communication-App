@@ -38,11 +38,88 @@ export class WebRTCManager {
     this.localStream = stream;
     this.setupAudioMeter(stream);
 
-    // Add tracks to all existing peer connections
+    // Add or replace tracks on all existing peer connections
     this.peers.forEach((pc) => {
+      const senders = pc.getSenders();
       stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
+        const existingSender =
+          senders.find((s) => s.track && s.track.kind === track.kind) ||
+          senders.find((s) => !s.track);
+        if (existingSender) {
+          existingSender.replaceTrack(track).catch((err) => console.warn('replaceTrack failed:', err));
+        } else {
+          try {
+            pc.addTrack(track, stream);
+          } catch (e) {
+            console.warn('addTrack failed:', e);
+          }
+        }
       });
+    });
+  }
+
+  public replaceVideoTrack(track: MediaStreamTrack | null) {
+    if (this.localStream && track) {
+      this.localStream.getVideoTracks().forEach((t) => {
+        if (t !== track) {
+          t.stop();
+          this.localStream?.removeTrack(t);
+        }
+      });
+      if (!this.localStream.getVideoTracks().includes(track)) {
+        this.localStream.addTrack(track);
+      }
+    }
+
+    this.peers.forEach((pc, peerId) => {
+      const senders = pc.getSenders();
+      const videoSender =
+        senders.find((s) => s.track && s.track.kind === 'video') ||
+        senders.find((s) => !s.track);
+
+      if (videoSender) {
+        videoSender.replaceTrack(track).catch((err) => console.warn('replaceVideoTrack failed:', err));
+      } else if (track && this.localStream) {
+        try {
+          pc.addTrack(track, this.localStream);
+          this.createOffer(peerId);
+        } catch (e) {
+          console.warn('addTrack video failed:', e);
+        }
+      }
+    });
+  }
+
+  public replaceAudioTrack(track: MediaStreamTrack | null) {
+    if (this.localStream && track) {
+      this.localStream.getAudioTracks().forEach((t) => {
+        if (t !== track) {
+          t.stop();
+          this.localStream?.removeTrack(t);
+        }
+      });
+      if (!this.localStream.getAudioTracks().includes(track)) {
+        this.localStream.addTrack(track);
+      }
+      this.setupAudioMeter(this.localStream);
+    }
+
+    this.peers.forEach((pc, peerId) => {
+      const senders = pc.getSenders();
+      const audioSender =
+        senders.find((s) => s.track && s.track.kind === 'audio') ||
+        senders.find((s) => !s.track);
+
+      if (audioSender) {
+        audioSender.replaceTrack(track).catch((err) => console.warn('replaceAudioTrack failed:', err));
+      } else if (track && this.localStream) {
+        try {
+          pc.addTrack(track, this.localStream);
+          this.createOffer(peerId);
+        } catch (e) {
+          console.warn('addTrack audio failed:', e);
+        }
+      }
     });
   }
 

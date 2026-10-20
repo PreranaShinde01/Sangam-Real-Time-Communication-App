@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Pin, PinOff, PictureInPicture2, Signal, ShieldCheck, Crown } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { Mic, MicOff, Pin, PinOff, PictureInPicture2, ShieldCheck, Crown } from 'lucide-react';
 import { Participant } from '@sangam/shared';
+import { useRoomStore } from '../../store/useRoomStore';
 
 interface VideoTileProps {
   participant: Participant;
@@ -22,33 +23,28 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   className = '',
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [hasVideoTrack, setHasVideoTrack] = useState(false);
+  const { audioEnabled, videoEnabled } = useRoomStore();
+
+  const isVideoActive = isLocal
+    ? videoEnabled && !!stream && stream.getVideoTracks().length > 0
+    : !!(participant.videoEnabled && stream && stream.getVideoTracks().length > 0);
+
+  const isAudioActive = isLocal ? audioEnabled : !!participant.audioEnabled;
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      const vTrack = stream.getVideoTracks()[0];
-      setHasVideoTrack(!!(vTrack && vTrack.enabled && participant.videoEnabled));
-
-      const handleTrackChange = () => {
-        setHasVideoTrack(!!(vTrack && vTrack.enabled && participant.videoEnabled));
-      };
-
-      if (vTrack) {
-        vTrack.addEventListener('mute', handleTrackChange);
-        vTrack.addEventListener('unmute', handleTrackChange);
-      }
-
-      return () => {
-        if (vTrack) {
-          vTrack.removeEventListener('mute', handleTrackChange);
-          vTrack.removeEventListener('unmute', handleTrackChange);
+    if (videoRef.current) {
+      if (stream) {
+        if (videoRef.current.srcObject !== stream) {
+          videoRef.current.srcObject = stream;
         }
-      };
-    } else {
-      setHasVideoTrack(false);
+        if (isVideoActive) {
+          videoRef.current.play().catch(() => {});
+        }
+      } else {
+        videoRef.current.srcObject = null;
+      }
     }
-  }, [stream, participant.videoEnabled]);
+  }, [stream, isVideoActive]);
 
   const handlePiP = async () => {
     if (videoRef.current && document.pictureInPictureEnabled) {
@@ -79,12 +75,12 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         playsInline
         muted={isLocal}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
-          hasVideoTrack ? 'opacity-100' : 'opacity-0'
+          isVideoActive ? 'opacity-100 block' : 'opacity-0 hidden'
         } ${isLocal ? 'scale-x-[-1]' : ''}`}
       />
 
       {/* Video Disabled / Avatar Fallback */}
-      {!hasVideoTrack && (
+      {!isVideoActive && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 p-4">
           <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-brand-600 to-cyan-500 flex items-center justify-center text-white text-2xl font-bold shadow-xl shadow-brand-500/20">
             {participant.avatarUrl ? (
@@ -120,7 +116,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
             {isPinned ? <PinOff className="w-3.5 h-3.5 text-brand-400" /> : <Pin className="w-3.5 h-3.5" />}
           </button>
         )}
-        {hasVideoTrack && (
+        {isVideoActive && (
           <button
             onClick={handlePiP}
             title="Picture in Picture"
@@ -156,12 +152,12 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         {/* Audio State Icon */}
         <div
           className={`p-1.5 rounded-lg backdrop-blur-md border ${
-            participant.audioEnabled
+            isAudioActive
               ? 'bg-slate-950/70 border-slate-800/80 text-slate-300'
               : 'bg-red-500/20 border-red-500/40 text-red-400'
           }`}
         >
-          {participant.audioEnabled ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
+          {isAudioActive ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
         </div>
       </div>
     </div>

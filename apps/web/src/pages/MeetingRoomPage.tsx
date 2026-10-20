@@ -68,6 +68,7 @@ export const MeetingRoomPage: React.FC = () => {
     setActiveSpeakerId,
     setSecurityModalOpen,
     resetRoom,
+    updateParticipantTrackState,
   } = useRoomStore();
 
   const [inLobby, setInLobby] = useState(false);
@@ -104,17 +105,23 @@ export const MeetingRoomPage: React.FC = () => {
           video: true,
           audio: true,
         });
-
-        // Apply initial toggle settings
-        stream.getAudioTracks().forEach((t) => (t.enabled = initialAudio));
-        stream.getVideoTracks().forEach((t) => (t.enabled = initialVideo));
-        setAudioEnabled(initialAudio);
-        setVideoEnabled(initialVideo);
       } catch {
-        // Fallback to empty stream if devices not allowed
-        stream = new MediaStream();
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch {
+            stream = new MediaStream();
+          }
+        }
       }
 
+      // Apply initial toggle settings
+      stream.getAudioTracks().forEach((t) => (t.enabled = initialAudio));
+      stream.getVideoTracks().forEach((t) => (t.enabled = initialVideo));
+      setAudioEnabled(initialAudio);
+      setVideoEnabled(initialVideo);
       setLocalStream(stream);
 
       // 2. Connect to Socket.io Gateway
@@ -213,18 +220,26 @@ export const MeetingRoomPage: React.FC = () => {
       }, 2500);
     });
 
+    // Track State Change (Mic / Cam / Screen)
+    socket.on(
+      SOCKET_EVENTS.TRACK_STATE_CHANGE,
+      (data: {
+        socketId: string;
+        audioEnabled?: boolean;
+        videoEnabled?: boolean;
+        screenShareEnabled?: boolean;
+        handRaised?: boolean;
+      }) => {
+        updateParticipantTrackState(data.socketId, data);
+      }
+    );
+
     // Hand Raise Toggle
     socket.on(SOCKET_EVENTS.HAND_RAISE_TOGGLE, (data: { socketId: string; handRaised: boolean }) => {
       if (data.socketId === socket.id) {
         setHandRaised(data.handRaised);
       }
-      useRoomStore.setState((state) => {
-        const p = state.participants[data.socketId];
-        if (p) {
-          p.handRaised = data.handRaised;
-        }
-        return { participants: { ...state.participants } };
-      });
+      updateParticipantTrackState(data.socketId, { handRaised: data.handRaised });
     });
 
     // File Shared
@@ -263,22 +278,74 @@ export const MeetingRoomPage: React.FC = () => {
     });
   };
 
-  const handleToggleAudio = (forcedVal?: boolean) => {
+  const handleToggleAudio = async (forcedVal?: boolean) => {
     const next = forcedVal !== undefined ? forcedVal : !audioEnabled;
-    if (localStream) {
-      localStream.getAudioTracks().forEach((t) => (t.enabled = next));
+    let stream = localStream;
+    const audioTracks = stream?.getAudioTracks() || [];
+
+    if (next && (audioTracks.length === 0 || audioTracks.every((t) => t.readyState === 'ended'))) {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newTrack = newStream.getAudioTracks()[0];
+        if (newTrack) {
+          if (!stream) {
+            stream = new MediaStream([newTrack]);
+            setLocalStream(stream);
+            rtcManagerRef.current?.setLocalStream(stream);
+          } else {
+            stream.addTrack(newTrack);
+          }
+          rtcManagerRef.current?.replaceAudioTrack(newTrack);
+        }
+      } catch (err) {
+        console.warn('Microphone permission or acquisition failed:', err);
+      }
+    } else {
+      audioTracks.forEach((t) => (t.enabled = next));
     }
+
     setAudioEnabled(next);
-    socketRef.current?.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { audioEnabled: next });
+    if (socketRef.current) {
+      socketRef.current.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { audioEnabled: next });
+      if (socketRef.current.id) {
+        updateParticipantTrackState(socketRef.current.id, { audioEnabled: next });
+      }
+    }
   };
 
-  const handleToggleVideo = () => {
+  const handleToggleVideo = async () => {
     const next = !videoEnabled;
-    if (localStream) {
-      localStream.getVideoTracks().forEach((t) => (t.enabled = next));
+    let stream = localStream;
+    const videoTracks = stream?.getVideoTracks() || [];
+
+    if (next && (videoTracks.length === 0 || videoTracks.every((t) => t.readyState === 'ended'))) {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newStream.getVideoTracks()[0];
+        if (newTrack) {
+          if (!stream) {
+            stream = new MediaStream([newTrack]);
+            setLocalStream(stream);
+            rtcManagerRef.current?.setLocalStream(stream);
+          } else {
+            stream.addTrack(newTrack);
+          }
+          rtcManagerRef.current?.replaceVideoTrack(newTrack);
+        }
+      } catch (err) {
+        console.warn('Camera permission or acquisition failed:', err);
+      }
+    } else {
+      videoTracks.forEach((t) => (t.enabled = next));
     }
+
     setVideoEnabled(next);
-    socketRef.current?.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { videoEnabled: next });
+    if (socketRef.current) {
+      socketRef.current.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { videoEnabled: next });
+      if (socketRef.current.id) {
+        updateParticipantTrackState(socketRef.current.id, { videoEnabled: next });
+      }
+    }
   };
 
   const handleToggleScreenShare = async () => {
@@ -291,6 +358,9 @@ export const MeetingRoomPage: React.FC = () => {
       rtcManagerRef.current?.setScreenStream(null);
       setScreenShareEnabled(false);
       socketRef.current?.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { screenShareEnabled: false });
+      if (socketRef.current?.id) {
+        updateParticipantTrackState(socketRef.current.id, { screenShareEnabled: false });
+      }
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -302,6 +372,9 @@ export const MeetingRoomPage: React.FC = () => {
         rtcManagerRef.current?.setScreenStream(stream);
         setScreenShareEnabled(true);
         socketRef.current?.emit(SOCKET_EVENTS.TRACK_STATE_CHANGE, { screenShareEnabled: true });
+        if (socketRef.current?.id) {
+          updateParticipantTrackState(socketRef.current.id, { screenShareEnabled: true });
+        }
 
         // Listen for user stopping share from browser UI
         stream.getVideoTracks()[0].onended = () => {
@@ -314,6 +387,11 @@ export const MeetingRoomPage: React.FC = () => {
   };
 
   const handleToggleHandRaise = () => {
+    const next = !handRaised;
+    setHandRaised(next);
+    if (socketRef.current?.id) {
+      updateParticipantTrackState(socketRef.current.id, { handRaised: next });
+    }
     socketRef.current?.emit(SOCKET_EVENTS.HAND_RAISE_TOGGLE);
   };
 

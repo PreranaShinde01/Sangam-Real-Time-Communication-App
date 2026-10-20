@@ -58,6 +58,10 @@ interface RoomStoreState {
   setVideoEnabled: (val: boolean) => void;
   setScreenShareEnabled: (val: boolean) => void;
   setHandRaised: (val: boolean) => void;
+  updateParticipantTrackState: (
+    socketId: string,
+    trackState: { audioEnabled?: boolean; videoEnabled?: boolean; screenShareEnabled?: boolean; handRaised?: boolean }
+  ) => void;
   setVirtualBackground: (val: 'none' | 'blur') => void;
   setActiveSpeakerId: (id: string | null) => void;
   setPinnedPeerId: (id: string | null) => void;
@@ -149,10 +153,63 @@ export const useRoomStore = create<RoomStoreState>((set) => ({
       return { remoteStreams: copy };
     }),
 
-  setAudioEnabled: (audioEnabled) => set({ audioEnabled }),
-  setVideoEnabled: (videoEnabled) => set({ videoEnabled }),
-  setScreenShareEnabled: (screenShareEnabled) => set({ screenShareEnabled }),
-  setHandRaised: (handRaised) => set({ handRaised }),
+  setAudioEnabled: (audioEnabled) =>
+    set((s) => {
+      const myParticipant = s.myParticipant ? { ...s.myParticipant, audioEnabled } : null;
+      const participants =
+        myParticipant && s.participants[myParticipant.id]
+          ? { ...s.participants, [myParticipant.id]: { ...s.participants[myParticipant.id], audioEnabled } }
+          : s.participants;
+      return { audioEnabled, myParticipant, participants };
+    }),
+
+  setVideoEnabled: (videoEnabled) =>
+    set((s) => {
+      const myParticipant = s.myParticipant ? { ...s.myParticipant, videoEnabled } : null;
+      const participants =
+        myParticipant && s.participants[myParticipant.id]
+          ? { ...s.participants, [myParticipant.id]: { ...s.participants[myParticipant.id], videoEnabled } }
+          : s.participants;
+      return { videoEnabled, myParticipant, participants };
+    }),
+
+  setScreenShareEnabled: (screenShareEnabled) =>
+    set((s) => {
+      const myParticipant = s.myParticipant ? { ...s.myParticipant, screenShareEnabled } : null;
+      const participants =
+        myParticipant && s.participants[myParticipant.id]
+          ? { ...s.participants, [myParticipant.id]: { ...s.participants[myParticipant.id], screenShareEnabled } }
+          : s.participants;
+      return { screenShareEnabled, myParticipant, participants };
+    }),
+
+  setHandRaised: (handRaised) =>
+    set((s) => {
+      const myParticipant = s.myParticipant ? { ...s.myParticipant, handRaised } : null;
+      const participants =
+        myParticipant && s.participants[myParticipant.id]
+          ? { ...s.participants, [myParticipant.id]: { ...s.participants[myParticipant.id], handRaised } }
+          : s.participants;
+      return { handRaised, myParticipant, participants };
+    }),
+
+  updateParticipantTrackState: (socketId, trackState) =>
+    set((s) => {
+      const existing = s.participants[socketId] || (s.myParticipant?.id === socketId ? s.myParticipant : null);
+      if (!existing) return s;
+
+      const updated = { ...existing, ...trackState };
+      const isMe = s.myParticipant?.id === socketId;
+
+      return {
+        participants: { ...s.participants, [socketId]: updated },
+        myParticipant: isMe ? updated : s.myParticipant,
+        ...(isMe && trackState.audioEnabled !== undefined ? { audioEnabled: trackState.audioEnabled } : {}),
+        ...(isMe && trackState.videoEnabled !== undefined ? { videoEnabled: trackState.videoEnabled } : {}),
+        ...(isMe && trackState.screenShareEnabled !== undefined ? { screenShareEnabled: trackState.screenShareEnabled } : {}),
+        ...(isMe && trackState.handRaised !== undefined ? { handRaised: trackState.handRaised } : {}),
+      };
+    }),
   setVirtualBackground: (virtualBackground) => set({ virtualBackground }),
   setActiveSpeakerId: (activeSpeakerId) => set({ activeSpeakerId }),
   setPinnedPeerId: (pinnedPeerId) => set({ pinnedPeerId }),
